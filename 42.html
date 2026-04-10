@@ -1,0 +1,689 @@
+html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>TikFlow | Короткие видео</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #000;
+            overflow-x: hidden;
+        }
+
+        /* Навигация */
+        .navbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 20px 25px;
+            border-top: 0.5px solid rgba(255,255,255,0.1);
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #888;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .nav-item.active {
+            color: #ff3b5c;
+        }
+
+        .nav-item span:first-child {
+            font-size: 24px;
+        }
+
+        /* Контейнер страниц */
+        .page {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 70px;
+            overflow-y: auto;
+            background: #000;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* Лента видео (как TikTok) */
+        .video-feed {
+            height: 100%;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        .video-container {
+            scroll-snap-align: start;
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .video-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 15px;
+            right: 80px;
+            color: white;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .video-username {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .video-caption {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .video-actions {
+            position: absolute;
+            right: 10px;
+            bottom: 80px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            z-index: 10;
+        }
+
+        .action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            color: white;
+            font-size: 12px;
+            text-shadow: 0 1px 2px black;
+            cursor: pointer;
+        }
+
+        .action-btn span:first-child {
+            font-size: 30px;
+        }
+
+        .liked {
+            color: #ff3b5c;
+        }
+
+        /* Профиль */
+        .profile-header {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 30px 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #ff3b5c;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 15px 0;
+        }
+
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+            background: #000;
+        }
+
+        .video-thumb {
+            aspect-ratio: 9/16;
+            background: #1a1a1a;
+            object-fit: cover;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        /* Загрузка видео */
+        .upload-area {
+            padding: 20px;
+            color: white;
+        }
+
+        .dropzone {
+            border: 2px dashed #ff3b5c;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.05);
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 10px;
+            color: white;
+            font-size: 16px;
+        }
+
+        button {
+            background: #ff3b5c;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        /* Аутентификация */
+        .auth-container {
+            padding: 40px 20px;
+            color: white;
+        }
+
+        .auth-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Страница аутентификации -->
+<div id="authPage" class="page active">
+    <div class="auth-container">
+        <div class="auth-card">
+            <h1 style="text-align: center; margin-bottom: 30px;">🎬 TikFlow</h1>
+            <div id="loginForm">
+                <input type="text" id="loginUsername" placeholder="Имя пользователя" autocomplete="off">
+                <input type="password" id="loginPassword" placeholder="Пароль">
+                <button onclick="login()">Войти</button>
+                <p style="text-align: center; margin-top: 15px;">Нет аккаунта? <span style="color:#ff3b5c; cursor:pointer;" onclick="showRegister()">Зарегистрироваться</span></p>
+            </div>
+            <div id="registerForm" style="display:none;">
+                <input type="text" id="regUsername" placeholder="Имя пользователя">
+                <input type="password" id="regPassword" placeholder="Пароль">
+                <input type="text" id="regName" placeholder="Отображаемое имя">
+                <button onclick="register()">Создать аккаунт</button>
+                <p style="text-align: center; margin-top: 15px;">Уже есть аккаунт? <span style="color:#ff3b5c; cursor:pointer;" onclick="showLogin()">Войти</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Основное приложение (после входа) -->
+<div id="app" style="display:none;">
+    <!-- Лента видео -->
+    <div id="feedPage" class="page active">
+        <div class="video-feed" id="videoFeed"></div>
+    </div>
+
+    <!-- Загрузка -->
+    <div id="uploadPage" class="page">
+        <div class="upload-area">
+            <h2>📤 Загрузить видео</h2>
+            <div class="dropzone" id="dropzone" onclick="document.getElementById('videoInput').click()">
+                📹 Нажмите или перетащите видео<br>
+                <small>MP4, WebM, до 50MB</small>
+            </div>
+            <input type="file" id="videoInput" accept="video/*" style="display:none" onchange="handleVideoSelect(this)">
+            <input type="text" id="videoCaption" placeholder="Описание видео...">
+            <button onclick="uploadVideo()">Опубликовать</button>
+        </div>
+    </div>
+
+    <!-- Профиль -->
+    <div id="profilePage" class="page">
+        <div id="profileContent"></div>
+    </div>
+
+    <!-- Навигация -->
+    <div class="navbar">
+        <div class="nav-item active" data-page="feed">
+            <span>🏠</span>
+            <span>Главная</span>
+        </div>
+        <div class="nav-item" data-page="upload">
+            <span>➕</span>
+            <span>Создать</span>
+        </div>
+        <div class="nav-item" data-page="profile">
+            <span>👤</span>
+            <span>Профиль</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========== ХРАНИЛИЩЕ (IndexedDB) ==========
+    let db;
+    let currentUser = null;
+
+    const DB_NAME = 'TikFlowDB';
+    const DB_VERSION = 2;
+
+    function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                db = request.result;
+                resolve(db);
+            };
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('users')) {
+                    const userStore = db.createObjectStore('users', { keyPath: 'username' });
+                    userStore.createIndex('password', 'password');
+                }
+                if (!db.objectStoreNames.contains('videos')) {
+                    const videoStore = db.createObjectStore('videos', { keyPath: 'id', autoIncrement: true });
+                    videoStore.createIndex('username', 'username');
+                    videoStore.createIndex('timestamp', 'timestamp');
+                }
+                if (!db.objectStoreNames.contains('likes')) {
+                    db.createObjectStore('likes', { keyPath: ['videoId', 'username'] });
+                }
+            };
+        });
+    }
+
+    async function saveUser(user) {
+        const tx = db.transaction('users', 'readwrite');
+        const store = tx.objectStore('users');
+        store.put(user);
+        return tx.complete;
+    }
+
+    async function getUser(username) {
+        const tx = db.transaction('users', 'readonly');
+        const store = tx.objectStore('users');
+        return new Promise((resolve) => {
+            const req = store.get(username);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        });
+    }
+
+    async function saveVideo(video) {
+        const tx = db.transaction('videos', 'readwrite');
+        const store = tx.objectStore('videos');
+        const id = await new Promise((resolve) => {
+            const req = store.add(video);
+            req.onsuccess = () => resolve(req.result);
+        });
+        return id;
+    }
+
+    async function getAllVideos() {
+        const tx = db.transaction('videos', 'readonly');
+        const store = tx.objectStore('videos');
+        const index = store.index('timestamp');
+        return new Promise((resolve) => {
+            const req = index.openCursor(null, 'prev');
+            const videos = [];
+            req.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    videos.push(cursor.value);
+                    cursor.continue();
+                } else {
+                    resolve(videos);
+                }
+            };
+        });
+    }
+
+    async function getUserVideos(username) {
+        const tx = db.transaction('videos', 'readonly');
+        const store = tx.objectStore('videos');
+        const index = store.index('username');
+        return new Promise((resolve) => {
+            const req = index.getAll(username);
+            req.onsuccess = () => resolve(req.result);
+        });
+    }
+
+    async function likeVideo(videoId, username) {
+        const tx = db.transaction('likes', 'readwrite');
+        const store = tx.objectStore('likes');
+        store.put({ videoId, username });
+        await tx.complete;
+    }
+
+    async function unlikeVideo(videoId, username) {
+        const tx = db.transaction('likes', 'readwrite');
+        const store = tx.objectStore('likes');
+        store.delete([videoId, username]);
+        await tx.complete;
+    }
+
+    async function isLiked(videoId, username) {
+        const tx = db.transaction('likes', 'readonly');
+        const store = tx.objectStore('likes');
+        return new Promise((resolve) => {
+            const req = store.get([videoId, username]);
+            req.onsuccess = () => resolve(!!req.result);
+        });
+    }
+
+    async function getLikesCount(videoId) {
+        const tx = db.transaction('likes', 'readonly');
+        const store = tx.objectStore('likes');
+        const all = await new Promise((resolve) => {
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result);
+        });
+        return all.filter(l => l.videoId === videoId).length;
+    }
+
+    // ========== АУТЕНТИФИКАЦИЯ ==========
+    window.showRegister = () => {
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'block';
+    };
+    window.showLogin = () => {
+        document.getElementById('loginForm').style.display = 'block';
+        document.getElementById('registerForm').style.display = 'none';
+    };
+
+    window.register = async () => {
+        const username = document.getElementById('regUsername').value.trim();
+        const password = document.getElementById('regPassword').value;
+        const name = document.getElementById('regName').value.trim() || username;
+        if (!username || !password) {
+            alert('Заполните все поля');
+            return;
+        }
+        const existing = await getUser(username);
+        if (existing) {
+            alert('Пользователь уже существует');
+            return;
+        }
+        const user = { username, password, name, avatar: '😎', videosCount: 0, followers: 0 };
+        await saveUser(user);
+        alert('Регистрация успешна! Войдите.');
+        showLogin();
+    };
+
+    window.login = async () => {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const user = await getUser(username);
+        if (!user || user.password !== password) {
+            alert('Неверные данные');
+            return;
+        }
+        currentUser = user;
+        document.getElementById('authPage').classList.remove('active');
+        document.getElementById('app').style.display = 'block';
+        await loadFeed();
+        loadProfile();
+        setupNavigation();
+    };
+
+    // ========== ЗАГРУЗКА ЛЕНТЫ ==========
+    async function loadFeed() {
+        const videos = await getAllVideos();
+        const feedContainer = document.getElementById('videoFeed');
+        feedContainer.innerHTML = '';
+        for (const video of videos) {
+            const likesCount = await getLikesCount(video.id);
+            const liked = await isLiked(video.id, currentUser.username);
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.innerHTML = `
+                <video src="${video.dataUrl}" loop muted playsinline></video>
+                <div class="video-overlay">
+                    <div class="video-username">@${video.username}</div>
+                    <div class="video-caption">${escapeHtml(video.caption)}</div>
+                </div>
+                <div class="video-actions">
+                    <div class="action-btn like-btn" data-id="${video.id}">
+                        <span>${liked ? '❤️' : '🤍'}</span>
+                        <span>${likesCount}</span>
+                    </div>
+                    <div class="action-btn">
+                        <span>💬</span>
+                        <span>0</span>
+                    </div>
+                </div>
+            `;
+            const videoEl = container.querySelector('video');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        videoEl.play().catch(e => {});
+                    } else {
+                        videoEl.pause();
+                    }
+                });
+            }, { threshold: 0.5 });
+            observer.observe(videoEl);
+            
+            const likeBtn = container.querySelector('.like-btn');
+            likeBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const vid = parseInt(likeBtn.dataset.id);
+                const currentlyLiked = await isLiked(vid, currentUser.username);
+                if (currentlyLiked) {
+                    await unlikeVideo(vid, currentUser.username);
+                } else {
+                    await likeVideo(vid, currentUser.username);
+                }
+                const newLikes = await getLikesCount(vid);
+                const newLiked = await isLiked(vid, currentUser.username);
+                likeBtn.innerHTML = `<span>${newLiked ? '❤️' : '🤍'}</span><span>${newLikes}</span>`;
+            });
+            
+            feedContainer.appendChild(container);
+        }
+        // авто-плей для первого
+        const firstVideo = feedContainer.querySelector('video');
+        if (firstVideo) firstVideo.play().catch(e=>{});
+    }
+
+    // ========== ЗАГРУЗКА ВИДЕО ==========
+    let selectedVideoFile = null;
+    window.handleVideoSelect = (input) => {
+        if (input.files && input.files[0]) {
+            selectedVideoFile = input.files[0];
+            alert(`Выбрано: ${selectedVideoFile.name}`);
+        }
+    };
+    const dropzone = document.getElementById('dropzone');
+    if(dropzone) {
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.style.borderColor = '#ff3b5c';
+        });
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.style.borderColor = '#ff3b5c';
+        });
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if(file && file.type.startsWith('video/')) {
+                selectedVideoFile = file;
+                alert(`Выбрано: ${file.name}`);
+            }
+        });
+    }
+    
+    window.uploadVideo = async () => {
+        if (!selectedVideoFile) {
+            alert('Выберите видео');
+            return;
+        }
+        const caption = document.getElementById('videoCaption').value;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const videoData = {
+                username: currentUser.username,
+                caption: caption || 'Без описания',
+                dataUrl: e.target.result,
+                timestamp: Date.now(),
+                likes: 0
+            };
+            const newId = await saveVideo(videoData);
+            alert('Видео опубликовано!');
+            selectedVideoFile = null;
+            document.getElementById('videoCaption').value = '';
+            document.getElementById('videoInput').value = '';
+            await loadFeed();
+            // переключиться на ленту
+            document.querySelector('.nav-item[data-page="feed"]').click();
+        };
+        reader.readAsDataURL(selectedVideoFile);
+    };
+    
+    // ========== ПРОФИЛЬ ==========
+    async function loadProfile() {
+        const userVideos = await getUserVideos(currentUser.username);
+        const allVideos = await getAllVideos();
+        let totalLikes = 0;
+        for(const v of userVideos) {
+            totalLikes += await getLikesCount(v.id);
+        }
+        const profileHtml = `
+            <div class="profile-header">
+                <div class="avatar">${currentUser.avatar || '🎮'}</div>
+                <h2>${escapeHtml(currentUser.name)}</h2>
+                <div>@${currentUser.username}</div>
+                <div class="stats">
+                    <div><strong>${userVideos.length}</strong><br>Видео</div>
+                    <div><strong>${totalLikes}</strong><br>Лайков</div>
+                    <div><strong>0</strong><br>Подписчиков</div>
+                </div>
+            </div>
+            <div class="video-grid" id="profileGrid"></div>
+        `;
+        document.getElementById('profileContent').innerHTML = profileHtml;
+        const grid = document.getElementById('profileGrid');
+        for(const vid of userVideos) {
+            const thumb = document.createElement('video');
+            thumb.src = vid.dataUrl;
+            thumb.muted = true;
+            thumb.loop = false;
+            thumb.className = 'video-thumb';
+            thumb.addEventListener('click', () => {
+                // Показать видео в ленте
+                document.querySelector('.nav-item[data-page="feed"]').click();
+                setTimeout(() => {
+                    const videos = document.querySelectorAll('.video-container video');
+                    for(let i=0; i<videos.length; i++) {
+                        if(videos[i].src === thumb.src) {
+                            videos[i].scrollIntoView({ behavior: 'smooth' });
+                            videos[i].play();
+                            break;
+                        }
+                    }
+                }, 100);
+            });
+            grid.appendChild(thumb);
+        }
+    }
+    
+    // ========== НАВИГАЦИЯ ==========
+    function setupNavigation() {
+        const navItems = document.querySelectorAll('.nav-item');
+        const pages = document.querySelectorAll('.page');
+        navItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const pageName = item.dataset.page;
+                pages.forEach(page => page.classList.remove('active'));
+                document.getElementById(`${pageName}Page`).classList.add('active');
+                navItems.forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+                if(pageName === 'profile') loadProfile();
+                if(pageName === 'feed') loadFeed();
+            });
+        });
+    }
+    
+    function escapeHtml(str) {
+        if(!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            return m;
+        });
+    }
+    
+    // ========== ИНИЦИАЛИЗАЦИЯ ==========
+    openDB().then(() => {
+        console.log('DB ready');
+        // проверяем, есть ли тестовый юзер
+        (async () => {
+            const demo = await getUser('demo');
+            if(!demo) {
+                await saveUser({ username: 'demo', password: '123', name: 'Демо пользователь', avatar: '🔥' });
+            }
+            const demo2 = await getUser('tiktoker');
+            if(!demo2) {
+                await saveUser({ username: 'tiktoker', password: '123', name: 'Креатор', avatar: '🎬' });
+                // добавим демо-видео образец (небольшой пример, но без реального видеофайла сложно, добавим заглушку)
+                // создадим пустышку? проще оставить без демо-видео, пользователи загрузят сами.
+            }
+        })();
+    });
+</script>
+</body>
+</html>
